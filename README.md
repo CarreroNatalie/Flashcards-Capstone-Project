@@ -5,8 +5,8 @@ This simple flashcards program allows users to create flashcards and study them 
 
 ## Getting Started
 To run the program, you will need any IDE or operating system that supports python3, such as Visual Studio Code. To run the program using the command line, type:
-```python
-python3 FlashcardApp.py
+```
+$ python3 FlashcardApp.py
 ```
 
 ### Installation
