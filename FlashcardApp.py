@@ -1,16 +1,15 @@
 import tkinter as tk
-from tkinter import DISABLED, END, NORMAL, StringVar, ttk, messagebox
+from tkinter import DISABLED, END, NORMAL, RAISED, StringVar, ttk, messagebox
+from tkinter import font as tkFont
 import json
 import os
+import random
 
 LARGEFONT = ("Times", 24)
 
 class Database():
     """Class designed to work with the .txt files that contain the flashcard
     data by using json dump and loads"""
-    def __init__(self):
-        """Constructor class - yet to add"""
-        pass
 
     def create_set(self, temp, title):
         """Creates a .txt file using user input on the title of the class. The
@@ -18,6 +17,15 @@ class Database():
         with open(str(title)+'.txt', 'w') as f:
             f.write(json.dumps(temp))
         f.close()
+
+    def file_to_dict(self):
+        """Takes the flashcard data from the file and converts it to a dictionary
+        using json"""
+        data = {}
+        with open(filename) as f:
+            data = json.load(f)
+        f.close()
+        return data
 
 class FlashcardApp(tk.Tk):
     """Main Class for the application that holds the different frames in a container
@@ -30,19 +38,19 @@ class FlashcardApp(tk.Tk):
         # __init__ function for class Tk
         tk.Tk.__init__(self, *args, **kwargs)
 
-        # creates containers
-        container = tk.Frame(self)
-        container.pack(side="top", fill="both", expand=True)
+        # creates container
+        self.container = tk.Frame(self)
+        self.container.pack(side="top", fill="both", expand=True)
 
-        container.grid_rowconfigure(0, weight=1)
-        container.grid_columnconfigure(0, weight=1)
+        self.container.grid_rowconfigure(0, weight=1)
+        self.container.grid_columnconfigure(0, weight=1)
 
         # different frames in program
         self.frames = {}
 
         # sets up frames
-        for f in (MainMenu, StudyMenu, EditMenu, NewMenu, ActiveStudying, EditingWindow):
-            frame = f(container, self)
+        for f in (MainMenu, StudyMenu, ActiveStudying, EditMenu, NewMenu, EditingWindow):
+            frame = f(self.container, self)
             self.frames[f] = frame
             frame.grid(row=0, column=0, sticky="nsew")
 
@@ -50,12 +58,11 @@ class FlashcardApp(tk.Tk):
         self.show_frame(MainMenu)
 
     def show_frame(self, cont):
-        """When called it displayed the proper frame to the user"""
+        """When called it displays the proper frame to the user"""
         for frame in self.frames.values():
             frame.grid_remove()
         frame = self.frames[cont]
         frame.grid()
-        #frame.tkraise()
     
     def refresh(self):
         """Destroys the root, then calls it again. Forces the program to refresh 
@@ -73,14 +80,18 @@ class MainMenu(tk.Frame):
         # inheritance
         tk.Frame.__init__(self, parent)
 
+        # initializing values
+        self.parent = parent
+        self.controller = controller
+
         # Label - creates and displays "Flashcards Menu"
         title_label = ttk.Label(self, text="Flashcards Menu", font = LARGEFONT)
         title_label.grid(row=0, column=1, sticky="N", padx=10, pady=10)
 
         # Creates four separate buttons
-        study_button = ttk.Button(self, text="Study", command=lambda:controller.show_frame(StudyMenu))
-        edit_button = ttk.Button(self, text="Edit", command=lambda:controller.show_frame(EditMenu))
-        new_button = ttk.Button(self, text="Create Set", command=lambda:controller.show_frame(NewMenu))
+        study_button = ttk.Button(self, text="Study", command=lambda:self.controller.show_frame(StudyMenu))
+        edit_button = ttk.Button(self, text="Edit", command=lambda:self.controller.show_frame(EditMenu))
+        new_button = ttk.Button(self, text="Create Set", command=lambda:self.controller.show_frame(NewMenu))
         exit_button = ttk.Button(self, text="Exit", command=self.quit)
 
         # Displays the buttons
@@ -103,16 +114,13 @@ class StudyMenu(tk.Frame):
         title_label.grid(row=0, column=1, columnspan=2, padx=10, pady=10)
 
         # Radiobuttons - creates a list of files and creates an option for those that are a flashcard set
-        v = tk.StringVar()
+        v = StringVar()
         counter = 1
         for item in os.listdir():
             if item.endswith(".txt"):
                 file_button = ttk.Radiobutton(self, text=item[:-4], variable=v, value=item, command=lambda:self.update_state(next_button, item))
                 file_button.grid(row=counter+1, column=1, sticky="W")
                 counter += 1
-                
-        #self.file = v.get()
-        # Currently working to get v.get() data into another class to use
 
         # Button - creates and displays the back button (to Main Menu)
         back_button = ttk.Button(self, text="Back", command = lambda : controller.show_frame(MainMenu))
@@ -127,32 +135,102 @@ class StudyMenu(tk.Frame):
         chosen"""
         next_button['state'] = NORMAL
 
-    def next(self, controller, value):
+    def next(self, controller, v):
         """Called when the next button is pressed"""
+        
+        # stores .txt filename as string
+        for item in os.listdir():
+            if item == v:
+                f = str(item)
+
+        # creates global variable in order for it to be accessed in ActiveStudying       
+        global filename
+        filename = f
+
         controller.show_frame(ActiveStudying)
-        #value
 
-
-class ActiveStudying(StudyMenu, tk.Frame):
+class ActiveStudying(Database, tk.Frame):
     """Active Studying - displays the card by card of the set chosen to study """
 
     def __init__(self, parent, controller):
         """Constructor - displays the labels and buttons for the Active Studying Menu"""
 
         # inheritance
-        StudyMenu.__init__(self, parent, controller)
+        Database.__init__(self)
         tk.Frame.__init__(self, parent)
 
-        # Label - Creates and displays title
-        title_label = ttk.Label(self, text="", font = LARGEFONT)
-        title_label.grid(row=0, column=1, sticky="N", padx=10, pady=10)
+        # initializing values
+        self.parent = parent
+        self.controller = controller
+
+        # Button - button command leads to study screen
+        buttonFont = tkFont.Font(family='Helvetica', size=16, weight=tkFont.BOLD)
+        self.study_button = tk.Button(self, text="Start Studying!", font=buttonFont, relief=RAISED, command=self.start_studying)
+        self.study_button.grid(row=0, column=0, sticky="N", padx=50, pady=50)
 
         # Button - Takes user back to the Study Menu
-        back_button = ttk.Button(self, text="Back", command = lambda : controller.show_frame(StudyMenu))
-        back_button.grid(row=1, column=1, sticky="SW", padx=10, pady=10)
+        back_button = ttk.Button(self, text="Back to Main Menu", command = lambda : controller.show_frame(StudyMenu))
+        back_button.grid(row=20, column=0, sticky="SW", padx=10, pady=10)
 
-        # Take in v.get()
+    def start_studying(self):
+        """Displays cards in a random order to study"""
 
+        # destroys the study button
+        self.study_button.destroy()
+
+        # creating a counter for the labels, buttons, and functions
+        global card_counter
+        card_counter = 0
+
+        # creating a list of randomized keys
+        data = super().file_to_dict()
+        term_list = list(data.keys())
+        random.shuffle(term_list)
+
+        # Label - displays flashcard title top of screen
+        title_label = ttk.Label(self, text="Studying Flashcard Set: "+filename[:-4], font=LARGEFONT)
+        title_label.grid(row=0, column=1, sticky="N", padx=10, pady=10)
+
+        # Label - inializing the label that contains the answer
+        answer_label = ttk.Label(self, text="")
+
+        def next(card_counter):
+            """Configures the labels and buttons and displays the next term. If the last term is studied
+            it will refresh the program and take the user to the main menu"""
+            card_counter += 1
+
+            if card_counter == len(term_list):
+                # finish studying
+                messagebox.showinfo("Flashcard App", "Finished studying!")
+                self.controller.refresh()
+                self.controller.show_frame(MainMenu)
+            else:
+                # configure labels and buttons
+                term_label.config(text = str(term_list[card_counter]))
+                answer_label.config(text="")
+                reveal_button.config(command = lambda : reveal_answer(data, term_list[card_counter])) 
+                next_card_button.config(command=lambda:next(card_counter))
+
+        def reveal_answer(data_dict, data_key):
+            """Reveals the answer to the user"""
+            defin = data_dict[data_key]
+            answer_label.config(text=defin)
+            answer_label.grid(row=3, column=1, sticky="S", padx=10, pady=10)
+
+        # Label - shows the user the term
+        term_label = tk.Label(self, text=str(term_list[card_counter]))
+        term_label.grid(row=1, column=1, sticky="WE", padx=10, pady=10)
+
+        # Button - reveals the answer when pressed
+        reveal_button = ttk.Button(self, text="Reveal Answer", command = lambda : reveal_answer(data, term_list[card_counter]))
+        reveal_button.grid(row=2, column=1, sticky="WE", padx=10, pady=10)
+
+        # Button - takes the user to the next card
+        next_card_button = ttk.Button(self, text="Next Card", command=lambda:next(card_counter))
+        next_card_button.grid(row=10, column=2, sticky="E", padx=10, pady=10)
+
+
+# note - EditMenu and Editing Window are not completed
 class EditMenu(tk.Frame):
     """Menu that allows the user to choose a set to edit"""
 
@@ -216,7 +294,7 @@ class NewMenu(Database, tk.Frame):
         title_label.grid(row=0, column=1, columnspan=2, sticky="EW", padx=10, pady=10)
 
         # Button - calls the back_button function 
-        back_button = ttk.Button(self, text="Back", command = lambda : self.back_button(controller))
+        back_button = ttk.Button(self, text="Back", command=self.back_button)
         back_button.grid(row=6, column=0, sticky="SW", padx=10, pady=10)
 
         # Label/Entry - tells the user to enter the title of the flashcard set
@@ -225,9 +303,11 @@ class NewMenu(Database, tk.Frame):
         self.name_entry = ttk.Entry(self, width=40)
         self.name_entry.grid(row=2, column=1, columnspan=2, padx=10, pady=10)
 
-        # Creates a dictionary for the flashcard set
+        # Creates a dictionary for the flashcard set and initalizes valeus
         self.temp = {}
         self.counter = 1
+        self.parent = parent
+        self.controller = controller
 
         # counter to display what card number the user is on
         counter_label = ttk.Label(self, text="Card " + str(self.counter) + ":")
@@ -250,7 +330,7 @@ class NewMenu(Database, tk.Frame):
         add_card_button.grid(row=6, column=2)
 
         # Button - calls the save_set function
-        save_button = ttk.Button(self, text="Save Set", command=lambda:self.save_set(controller))
+        save_button = ttk.Button(self, text="Save Set", command=self.save_set)
         save_button.grid(row=6, column=3, sticky="SE", padx=10, pady=10)
 
 
@@ -261,33 +341,37 @@ class NewMenu(Database, tk.Frame):
         self.counter += 1
         self.temp[term] = defin
 
+        # displays the next number
         counter_label = ttk.Label(self, text="Card " + str(self.counter) + ":")
         counter_label.grid(row=3, column=1, sticky="W")
 
+        # delete entries
         self.term_entry.delete(0, END)
         self.def_entry.delete(0, END)
 
 
-    def save_set(self, controller):
+    def save_set(self):
         """Sends the dictionary to the database for a .txt file to be created, deletes the 
         flashcard title entry, restarts the counter, displays a messagebox to show the set saved,
         refreshs the frame for the new data and returns the user back to the main menu"""
-        #title = self.name_entry.get()
 
+        # sends dictionary to Database to be converted to .txt
         super().create_set(self.temp, self.name_entry.get())
 
+        # deletes entry
         self.name_entry.delete(0, END)
 
+        # resets counter
         self.counter = 1
         counter_label = ttk.Label(self, text="Card " + str(self.counter) + ":")
         counter_label.grid(row=3, column=1, sticky="W")
 
         messagebox.showinfo("Flashcard App", "Flashcard set saved!")
 
-        controller.refresh()
-        controller.show_frame(MainMenu)
+        self.controller.refresh()
+        self.controller.show_frame(MainMenu)
 
-    def back_button(self, controller):
+    def back_button(self):
         """Resets the card counter, clear the entries, and return the user back to the
         main menu"""
         self.counter = 1
@@ -298,7 +382,7 @@ class NewMenu(Database, tk.Frame):
         self.term_entry.delete(0, END)
         self.def_entry.delete(0, END)
 
-        controller.show_frame(MainMenu)
+        self.controller.show_frame(MainMenu)
 
 # Main Program:
 f = FlashcardApp()
